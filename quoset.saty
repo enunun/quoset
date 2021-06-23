@@ -1,0 +1,239 @@
+@require: class-jlreq/jlreq
+@require: class-jlreq/theorem
+@require: itemize
+
+let-mutable theorem-counter <- 0
+let-block ctx +theorem = JLReqTheorem.theorem-scheme (|JLReqTheorem.default-config-theorem with
+	font = [italic];
+|) {定理} theorem-counter ctx
+let-block ctx +example = JLReqTheorem.theorem-scheme (|JLReqTheorem.default-config-theorem with
+	font = [italic];
+|) {例} theorem-counter ctx
+let-block ctx +definition = JLReqTheorem.theorem-scheme (|JLReqTheorem.default-config-theorem with
+	font = [italic];
+|) {定義} theorem-counter ctx
+let-math \qed = ${□}
+
+let-block +proof it = '<
+	+pn{
+		（証明）
+	}
+	#it;
+> 
+
+let-math \coord x = ${\paren{#x}}
+let-math \imply = ${\Longrightarrow}
+let-math \equivalence = ${\Longleftrightarrow}
+let-math \pair pair = ${\paren{#pair}}
+let-math \relclass x = ${\sqbracket{#x}}
+let-math \qed =${□}
+
+     
+let font-ratio-latin = 1.
+let font-ratio-cjk = 0.88
+let font-cjk-gothic = (`ipaexg`, font-ratio-cjk, 0.)
+let font-latin-italic = (`Junicode-it`, font-ratio-latin, 0.)
+let set-cjk-font font ctx =
+  ctx |> set-font HanIdeographic font
+      |> set-font Kana           font
+
+let-inline ctx \emph inner =
+    let ctx =
+      ctx |> set-font Latin font-latin-italic
+          |> set-cjk-font font-cjk-gothic
+    in
+      read-inline ctx inner
+let-inline \term inner = {\emph{#inner;}}
+
+
+in
+
+document(|
+	title = {商集合ドリブンで理解する同値関係};
+	author = {野口匠};
+	date = {2021年6月23日};
+	show-title = true;
+	show-toc = false;
+|) '<
+	+p{
+		この文書は現在書きかけです．\SATySFi; Conf 2021が終わったら追記します．
+	}
+
+	+section ?:(`abstract`){概要}<
+		+p{
+			同値関係や商集合は，数学において「ある関係にあるものを同一視する」という目的で頻繁に使われる．
+			しかし，同値関係や商集合の定義からそのような解釈を自然に導き出せるような解説はあまりみられない．
+			そこで本稿では，同値関係や商集合が「同一視」のための基本的なツールであることが自然に納得できるような解説を試みる．
+			「同一視」という素朴的概念が集合論の力を得て一切のあいまいさのない数学的概念に昇華されていくさまをみることは，
+			数学を学ぶ楽しさの1つである．
+		}
+		+p{	
+			しかも幸いなことに，「同一視して得られる集合」に求めるべき性質を列挙すると，
+			そこから自然に定義される二項関係は同値関係に限ることを証明することができる（定理\ref(`characterize`);）．
+			この事実は，集合論で「同一視」という概念を定式化しようとすれば同値関係や商集合が必然的に現れることを示すものである．
+		}
+		+p{
+			後半では，任意の二項関係からその二項関係を含むような最小の同値関係を得る方法を例とともに述べる．
+			これにより，同値関係と商集合がよりいっそう身近なものに感じられるであろう．
+		}
+	>
+	+section?:(`identify`){数学における「同一視」}
+	<
+		+p{数学では，本質的な部分の違いのみを問題にして，その他は要素は無視したいという場面がよくある．このような状況例を挙げよう．}
+		+example?:(`vecter`) <
+			+p{
+				空間の2点${x_1, x_2}に対し，${x_1}から${x_2}に向かう向きつきの線分${x_1 x_2}を考える．
+				この線分${x_1 x_2}の向きと長さのみを問題にして，その位置は無視する場合，
+				それは古典的に「ベクトル」と呼ばれるものになる．
+			}
+		>
+		+example?:(`mapping`) <
+			+p{
+				2つの写像${f \mathpunct{:} X \to Y}と${g \mathpunct{:} X \to Z}が与えられたとき，任意の${x \in X}に対して
+				${\app{f}{x} = \app{g}{x}}が成り立っていれば，${Y = Z}でなくとも${f = g}とみなしたい場合がある．
+				これは「終域の違いを無視して定義域とその像のみを問題にする」ということに相当する．
+			}
+		>
+			+example?:(`remainder`) <
+			+p{
+				与えられた整数${n}が偶数であるか奇数であるかは，${n}を${2}で割った余りによってのみ決まる．
+				整数を偶数と奇数にわけるということは，整数を${2}で割った余りのみを問題にして，
+				その他の一切の要素は無視するということに相当する．
+			}
+		>
+		+p{
+			この2つの例は，ある要素のみを問題にしてその他の要素は無視したいという意識が共通している．
+			しかし，特に例\ref(`vecter`);と例\ref(`mapping`);においては，その記述はあいまいで，少なくとも明確な定義が与えられているとはいいがたい．
+			以後，このような「同一視」に対してあいまいさのないクリアな定義を与えることを試みる．
+			こういう場合に威力を発揮するのが集合論である．
+		}
+	>
+	+section?:(`equivalence`){集合の分割と同値関係} <
+		+p{
+			まずは，そもそも「何と何を同一視するのか」ということの基準となる概念が必要である．
+			ここではさらに一般に，モノとモノとの「関係」を定式化しよう．
+		}
+		+definition ?:(`relation`) <
+			+p{
+				集合${X}と${R \subset X \times X}が与えられたとき，${\pair{x, y} \in R}を「${x}と${y}には${R}という関係がある」
+				と解釈したい文脈においては，この${R}を\term{二項関係}と呼ぶ．
+				そしてこのとき，${\pair{x,y} \in R}の代わりに
+				\eqn(
+					${
+						x \mathrel{R} y
+					}
+				);%
+				とかく．
+			}
+		>
+		+p{
+			上の「定義」は，何が二項関係で何が二項関係でないかを明確に線引きするものではない．
+			その意味では，これを「定義」と呼ぶのは不適切であるように見える．
+			しかし筆者個人としては，「二項関係」という用語の使われ方を考えれば
+			この程度のラフな「定義」にとどめておくのが妥当であるように思える．
+		}
+		+p{
+			二項関係さえ定式化してしまえば，先ほど述べた「同一視」を定式化するのは容易である．
+			考えたい集合${X}上に同一視の基準となる二項関係${R}を与え，各${x \in R}について
+			${x \mathrel{R} y}なる${y}をすべて集めて集合を作り，
+			その集合をひとつのモノであるかのように扱ってしまえばよい．
+		}
+		+definition?:(`relclass`) <
+			+p{
+				集合${X}上に二項関係${R}が与えられたとき，各${x \in X}に対して，集合
+				\eqn(
+					${\setsep{y \in X}{x \mathrel{R} y}}
+				);%
+				を
+				\eqn(
+					${\relclass{x}}
+				);%
+				と表す．さらに，この${\relclass{x}}全体の集合，
+				すなわち集合${\setsep{\relclass{x}}{x \in X}}を
+				\eqn(
+					${X / R}
+				);%
+				と表す．
+			}
+		>
+		+p{
+			以上のような定義の上で，${X}の代わりに集合${X/R}を考えることで，
+			${R}という関係のある${X}の元を同一視できたように見えるが，
+			二項関係として任意のものを認めてしまうと不都合が生じてしまう．
+			何よりも不都合なのは，上記のように定義される${\relclass{x}}たちが
+			${X}の分割を与えるとは限らないという点である．
+			ここで，集合の分割とは次のような概念である：
+		}
+		+definition ?:(`separation`) <
+			+p{
+				集合${X}に対し，${X}の部分集合からなる集合族${\mathcal{S}}が，
+				${X = \bigcup \mathcal{S}}を満たし，${S_1 \neq S_2}となる任意の${S_1, S_2 \in \mathcal{S}}に対して
+				${S_1 \cap S_2 = \emptyset}であるとする．
+				このとき，この集合族${\mathcal{S}}を${X}の\term{分割}という．
+			}
+		>
+		+p{
+			${z \in X}が${x \mathrel{R} y}でない${x, y}に対して${z \in \relclass{x}}と${z \in \relclass{y}}を同時に満たしてしまったり，
+			ある${x \in X}に対して${x \in \relclass{x}}も成り立たないようでは，
+			「${R}という関係にあるものを同一視して集合を得た」とはいいがたい．
+			前者では${z}が${X}のどの元と同一視されているのかがわからないし，後者ではある元が自身と同一視されないことになってしまうからである．
+			後者と同じ理由で，ある${z \in X}に対して${z \in \relclass{x}}なる${x \in X}が存在しない，というのも不合理であろう．
+			つまり，上の${X/R}が${X}の分割を与えているべきであろう，ということである．
+			この問いについて考えると，自然に同値関係の概念が浮かび上がってくる．
+		}
+		+theorem ?:(`characterize`) <
+			+p{
+				集合${X}と${X}の分割${\mathcal{S}}が与えられたとする．
+				${X}上の二項関係${R}を
+				\eqn(
+					${x \mathrel{R} y \equivalence \exists S \in \mathcal{S} \paren{x \in S \land y \in S}}
+				);%
+				で定めたとき，
+				${R}は以下の性質をすべて満たす：
+				\listing{
+					* すべての${x \in X}に対して${x \mathrel{R} x}，
+					* ${x \mathrel{R} y}ならばつねに${y \mathrel{R} x}，
+					* ${x \mathrel{R} y}かつ${y \mathrel{R} z}ならばつねに${x \mathrel{R} z}．
+				}
+				二項関係に関するこれらの性質を順に\term{反射律}，\term{対称律}，\term{推移律}という．
+				逆に，${R}がこの3つの性質をすべて満たすならば${X/R}は${X}の分割である．
+			}
+		>
+		+proof <
+			+p{
+				${\mathcal{S}}が${X}の分割であるとする．
+				${x \in X}をひとつとると，${x \in S}となる${S \in \mathcal{S}}が存在する．
+				この${S}に対して${x \in S \land S}でもあるから${x \mathrel{R} x}である．
+				また，${x \mathrel{R} y}とすると，${S \in \mathcal{S}}で${x \in S \land y \in S}となるものがとれる．
+				この${S}に対して${y \in S \land x \in S}でもあるから${y \mathrel{R} x}
+				である．よって${R}は反射律と対称律を満たす．
+				${R}が推移律を満たすことを示そう．${x \mathrel{R} y}かつ${y \mathrel{R} z}とする．
+				このとき，${x \in S \land y \in S}となる${S \in \mathcal{S}}
+				と${y \in S' \land z \in S'}となる${S' \in \mathcal{S}}がそれぞれとれる．
+				${y \in S}かつ${y \in S'}であり，
+				${S \neq S'}ならば${S \cap S' = \emptyset}なので
+				${S = S'}でなければならない．よってこの${S}に対して${x \in S \land z \in S}
+				だから${x \mathrel{R} z}である．従って${R}が推移律も満たすことが示された．
+			}
+			+p{
+				後半部分を示そう．${R}が反射律，対称律，推移律のすべてを満たすとする．
+				${x \in X}をひとつとると，反射律から${x \in \relclass{x}}が成り立つので
+				${X \subset \bigcup_{x \in X} \relclass{x}}である．${X/R}の各元は${X}の部分集合であるから
+				${\bigcup_{x \in X} \relclass{x} \subset X}となり，${X = \bigcup_{x \in X} \relclass{x}}が従う．
+				さらに${A, B \in X/R}を任意にとる．このとき，${A = \relclass{a}}かつ${B = \relclass{b}}
+				なる${a, b \in X}がとれる
+				\footnote{%
+					当然だが，この${a, b}は一意には定まるとは限らない．
+				}%
+				．${A \cap B \neq \emptyset}とすると${A \cap B}の元${x}がとれて，${x \in \relclass{a}}かつ${x \in \relclass{b}}だから
+				${x \mathrel{R} a}かつ${x \mathrel{R} b}である．${y \in A = \relclass{a}}なる${y}を任意にとれば
+				${y \mathrel{R} a}であって，対称律から${a \mathrel{R} x}であり，推移律から${y \mathrel{R} x}が従う．
+				さらに推移律によって${y \mathrel{R} b}が得られ，対称律から${b \mathrel{R} y}となる．
+				従って${y \in \relclass{b} = B}であるから${A \subset B}となる．
+				同様にして${B \subset A}もいえるので${A = B}である．以上で${A \neq B \imply A \cap B = \emptyset}の
+				対偶が示され，${X/R}は${X}の分割であることがわかる．${\qed}
+			}
+		>
+	>
+		
+>
